@@ -1,16 +1,8 @@
-const fs = require("fs");
-
-const source = fs.readFileSync("scripts/main.js", "utf8");
-const instrumented = source.replace(
-  /\}\)\(\);\s*$/,
-  "globalThis.__xpUiTest = { planMatchesFilter, planKey }; })();"
-);
-if (instrumented === source) throw new Error("Could not expose UI design test seam");
-
 globalThis.foundry = { appv1: { api: { Dialog: class {} } }, utils: { deepClone: value => value } };
 globalThis.Hooks = { once() {}, on() {} };
 globalThis.game = { pf2e: { gm: { calculateXP() { return {}; } } } };
-new Function(instrumented)();
+async function run() {
+const api = await import("../scripts/view.mjs");
 
 const items = ["add", "adjust", "composite"].map((kind, sourceIdx) => ({ kind, sourceKey: "exact", sourceIdx }));
 const expected = {
@@ -20,14 +12,16 @@ const expected = {
   mixed: ["composite"]
 };
 for (const [filter, kinds] of Object.entries(expected)) {
-  const actual = items.filter(item => globalThis.__xpUiTest.planMatchesFilter(item, filter)).map(item => item.kind);
+  const actual = items.filter(item => api.planMatchesFilter(item, filter)).map(item => item.kind);
   if (JSON.stringify(actual) !== JSON.stringify(kinds)) {
     throw new Error(`Plan filter ${filter} returned ${JSON.stringify(actual)}`);
   }
 }
 
-if (globalThis.__xpUiTest.planKey(items[0]) !== "add:exact:0") {
+if (api.planKey(items[0]) !== "add:exact:0") {
   throw new Error("Selected-plan key is unstable");
 }
 
 console.log("PASS: strategy filters and selected-plan keys");
+}
+run().catch(error => { console.error(error); process.exitCode = 1; });

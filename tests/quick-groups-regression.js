@@ -1,14 +1,10 @@
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-
-const source = fs.readFileSync("scripts/main.js", "utf8");
-const instrumented = source.replace(/\}\)\(\);\s*$/, "globalThis.__quickGroupTest = { QUICK_GROUPS, renderStructureControl, buildQuickGroupPlan, renderPlansSection, attachListeners }; })();");
-assert.notEqual(instrumented, source);
 
 globalThis.foundry = { appv1: { api: { Dialog: class {} } }, utils: { deepClone: value => value } };
 globalThis.Hooks = { once() {}, on() {} };
 globalThis.game = { i18n: { localize: key => key, format: key => key } };
-new Function(instrumented)();
+(async () => {
+globalThis.__quickGroupTest = { ...await import("../scripts/core.mjs"), ...await import("../scripts/view.mjs"), ...await import("../scripts/main.mjs") };
 
 const api = globalThis.__quickGroupTest;
 assert.equal(Object.keys(api.QUICK_GROUPS).length, 7);
@@ -67,3 +63,4 @@ state.themeCandidateCache = new Map();
 assert.equal(api.buildQuickGroupPlan(state), null);
 
 console.log("PASS: seven quick groups use exact creature levels and preview plan wiring");
+})().catch(error => { console.error(error); process.exitCode = 1; });

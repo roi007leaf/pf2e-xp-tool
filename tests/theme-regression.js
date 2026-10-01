@@ -1,11 +1,8 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 
-const source = fs.readFileSync("scripts/main.js", "utf8");
 const css = fs.readFileSync("styles/main.css", "utf8");
 assert.match(css, /\.trait-picker \{[^}]*position: absolute;/);
-const instrumented = source.replace(/\}\)\(\);\s*$/, "globalThis.__themeTest = { renderThemeControl, creatureCandidateFor, planMatchesTheme, loadCreatureCandidates, addThemeTrait, removeThemeTrait, creatureTraitOptions, attachListeners }; })();");
-assert.notEqual(instrumented, source);
 
 globalThis.foundry = { appv1: { api: { Dialog: class {} } }, utils: {
   deepClone: value => value,
@@ -17,7 +14,8 @@ globalThis.CONFIG = { PF2E: { creatureTraits: {
   fey: "Fey", demon: "Demon", undead: "Undead", forest: "Forest",
   dragon: "Dragon", fire: "Fire", leshy: "Leshy", plant: "Plant",
 } } };
-new Function(instrumented)();
+(async () => {
+globalThis.__themeTest = { ...await import("../scripts/core.mjs"), ...await import("../scripts/view.mjs"), ...await import("../scripts/main.mjs") };
 
 assert.equal(globalThis.__themeTest.creatureTraitOptions().length, 8);
 const pickerState = { theme: "", traitPickerOpen: false, npcs: [] };
@@ -130,9 +128,9 @@ globalThis.game.packs = [{
       system: { details: { level: { value: 3 }, publicNotes: "A leshy guardian" }, traits: { value: ["plant"] } } }];
   },
 }];
-globalThis.__themeTest.loadCreatureCandidates().then(byLevel => {
+const byLevel = await globalThis.__themeTest.loadCreatureCandidates();
   const candidate = byLevel.get(3)[0];
   assert.deepEqual(candidate.traits, ["plant"]);
   assert.match(candidate.searchText, /leshy/);
   console.log("PASS: theme control and creature suggestions use indexed theme data");
-}).catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => { console.error(error); process.exitCode = 1; });
